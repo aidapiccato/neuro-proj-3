@@ -2,19 +2,20 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
+
 class BCMSynapse(object):
     def __init__(
-        self, 
+        self,
         epsilon,
-        y_0, 
-        window_len, 
-    ):    
+        y_0,
+        window_len,
+    ):
         """Constructor
 
         Args:
             epsilon (float): Weight decay term
-            y_baseline (float): Baseline postsynaptic activity 
-            window_len (int): Length (in timesteps) of temporal window over which 
+            y_baseline (float): Baseline postsynaptic activity
+            window_len (int): Length (in timesteps) of temporal window over which
                 average postsynaptic activity is calculated
         """
 
@@ -22,25 +23,24 @@ class BCMSynapse(object):
         self._y_0 = y_0
         self._window_len = window_len
 
-    def _step(self, input, w, y, theta):
+    def _step(self, input, w, y, theta, dt):
         """Single step of weight updates and output calculation/
 
         Args:
             input (np.array): Vector of presynaptic neur. activities
             w (np.array): Weight vector on previous timestep
             y (np.array): History of output
-            theta (float): Current threshold 
+            theta (float): Current threshold
         Returns:
             new_w (np.array): Updated weight vector
             new_y (float): Postsynaptic neuron output
             new_theta (float): Updated threshold
         """
-        new_y = np.dot(w, input) 
+        new_y = np.dot(w, input)
         dot_w = new_y * (new_y - theta) * input - self._epsilon * w
-        new_w = w + dot_w
-        new_theta = np.mean(y[-self._window_len:]/self._y_0)
+        new_w = w + dot_w * dt
+        new_theta = np.mean(y[-self._window_len :] / self._y_0)
         return new_w, new_y, new_theta
-
 
     def _init_w(self, n_presynaptic):
         """Initializes weight vector, sampling from U[0, 1]
@@ -49,19 +49,21 @@ class BCMSynapse(object):
             n_presynaptic (int): Number of presynaptic neurons
 
         Returns:
-            np.array: Weight vector 
+            np.array: Weight vector
         """
-        return np.random.uniform(size=(n_presynaptic))
+        # return np.random.uniform(size=(n_presynaptic))
+        # return np.random.uniform(low=0.4, high=0.6, size=(n_presynaptic))
+        return np.full(shape=(n_presynaptic), fill_value=0.5)
 
     def _init_theta(self):
         """Returns initial value of theta
         Returns:
             (float): Theta value
         """
-        return 0.5 
+        return 0.5
 
-    def forward(self, input):
-        """Forward pass through input sequence . 
+    def forward(self, input, time):
+        """Forward pass through input sequence .
 
         Args:
             input (np.array): Matrix of presynaptic neuron activations
@@ -71,6 +73,7 @@ class BCMSynapse(object):
             theta (np.array): Vector of thresholds
         """
         n_timesteps = input.shape[0]
+        dt = time / n_timesteps
         n_presynaptic = input.shape[1]
         w = np.zeros((n_timesteps, n_presynaptic))
         y = np.zeros((n_timesteps))
@@ -80,10 +83,7 @@ class BCMSynapse(object):
         for t in range(1, n_timesteps):
             step_input = input[t]
             step_w, step_y, step_theta = self._step(
-                input=step_input, 
-                w=w[t-1], 
-                y=y[:t], 
-                theta=theta[t-1]
+                input=step_input, w=w[t - 1], y=y[:t], theta=theta[t - 1], dt=dt
             )
             w[t] = step_w
             y[t] = step_y
@@ -91,15 +91,14 @@ class BCMSynapse(object):
         return w, y, theta
 
 
-
 if __name__ == "__main__":
     # Testing initial implementation
     n_presynaptic = 1
-    n_seconds = 5 # length of simulation in seconds
-    dt = 0.001 # duration of each timestep in seconds
-    n_timesteps = int(n_seconds/dt) # number of timesteps in seconds
-    stim_start = int(1/dt) # start of stimulation, in timesteps
-    stim_end = int(4/dt) # end of stimulation, in timesteps
+    n_seconds = 5  # length of simulation in seconds
+    dt = 0.001  # duration of each timestep in seconds
+    n_timesteps = int(n_seconds / dt)  # number of timesteps in seconds
+    stim_start = int(1 / dt)  # start of stimulation, in timesteps
+    stim_end = int(4 / dt)  # end of stimulation, in timesteps
     stim_strength = 10  # strength of stimulus
     input = np.zeros((n_timesteps, 1))
     input[stim_start:stim_end] = stim_strength
@@ -108,35 +107,30 @@ if __name__ == "__main__":
 
     plt.clf()
     ax = plt.gca()
-    time = np.cumsum(np.full_like(input, dt)) 
+    time = np.cumsum(np.full_like(input, dt))
     plot = sns.lineplot(x=time, y=w.squeeze(), ax=ax)
-    plot.set_xlabel('time (s)')
-    plot.set_ylabel('w (a.u)')
-    plt.savefig('images/single_synapse_w', dpi=300)
+    plot.set_xlabel("time (s)")
+    plot.set_ylabel("w (a.u)")
+    plt.savefig("images/single_synapse_w", dpi=300)
 
     plt.clf()
     ax = plt.gca()
-    time = np.cumsum(np.full_like(input, dt)) 
+    time = np.cumsum(np.full_like(input, dt))
     plot = sns.lineplot(x=time, y=input.squeeze(), ax=ax)
-    plot.set_xlabel('time (s)')
-    plot.set_ylabel('input (spikes/s)')
-    plt.savefig('images/single_synapse_input', dpi=300)
+    plot.set_xlabel("time (s)")
+    plot.set_ylabel("input (spikes/s)")
+    plt.savefig("images/single_synapse_input", dpi=300)
 
     plt.clf()
     ax = plt.gca()
     plot = sns.lineplot(x=time, y=y, ax=ax)
-    plot.set_xlabel('time (s)')
-    plot.set_ylabel('output (spikes/s)')
-    plt.savefig('images/single_synapse_y', dpi=300)
+    plot.set_xlabel("time (s)")
+    plot.set_ylabel("output (spikes/s)")
+    plt.savefig("images/single_synapse_y", dpi=300)
 
     plt.clf()
     ax = plt.gca()
     plot = sns.lineplot(x=time, y=theta, ax=ax)
-    plot.set_xlabel('time (s)')
-    plot.set_ylabel('$\\theta$ (spikes/s)')
-    plt.savefig('images/single_synapse_theta', dpi=300)
-
-
-
-
-
+    plot.set_xlabel("time (s)")
+    plot.set_ylabel("$\\theta$ (spikes/s)")
+    plt.savefig("images/single_synapse_theta", dpi=300)
